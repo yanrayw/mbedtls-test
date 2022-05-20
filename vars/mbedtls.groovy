@@ -17,6 +17,8 @@
  *  This file is part of Mbed TLS (https://www.trustedfirmware.org/projects/mbed-tls/)
  */
 
+import jenkins.branch.BranchIndexingCause
+
 def run_tls_tests(label_prefix='') {
     try {
         def jobs = [:]
@@ -79,16 +81,23 @@ def run_pr_job(is_production=true) {
             * If a PR hasn't been updated recently enough, don't run the merge
             * job for that PR.
             */
-            if (env.BRANCH_NAME ==~ /PR-\d+-merge/ &&
-                currentBuild.rawBuild.getCauses()[0].toString().contains('BranchIndexingCause'))
-            {
-                upd_timestamp_ms = pullRequest.updatedAt.getTime()
-                now_timestamp_ms = currentBuild.startTimeInMillis
-                /* current threshold is 7 days */
-                long threshold_ms = 7L * 24L * 60L * 60L * 1000L
-                if (now_timestamp_ms - upd_timestamp_ms > threshold_ms) {
-                    currentBuild.result = 'NOT_BUILT'
-                    error('Pre Test Checks did not run: PR has not been updated recently enough.')
+            if (env.BRANCH_NAME ==~ /PR-\d+-merge/ ) {
+                long upd_timestamp_ms = 0L
+                long now_timestamp_ms = currentBuild.startTimeInMillis
+                try {
+                    if (currentBuild.rawBuild.causes[0] instanceof BranchIndexingCause) {
+                        upd_timestamp_ms = (currentBuild.previousBuild?.buildVariables?.UPD_TIMESTAMP_MS ?: pullRequest.updatedAt.time) as long
+                        /* current threshold is 7 days */
+                        long threshold_ms = 7L * 24L * 60L * 60L * 1000L
+                        if (now_timestamp_ms - upd_timestamp_ms > threshold_ms) {
+                            currentBuild.result = 'NOT_BUILT'
+                            error("Pre Test Checks did not run: PR was last updated on ${new Date(upd_timestamp_ms)}.")
+                        }
+                    } else {
+                        upd_timestamp_ms = now_timestamp_ms
+                    }
+                } finally {
+                    env.UPD_TIMESTAMP_MS = upd_timestamp_ms
                 }
             }
 
