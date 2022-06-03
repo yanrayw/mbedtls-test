@@ -92,6 +92,7 @@ def run_pr_job(is_production=true) {
                 try {
                     if (currentBuild.rawBuild.causes[0] instanceof BranchIndexingCause) {
                         upd_timestamp_ms = (currentBuild.previousBuild?.buildVariables?.UPD_TIMESTAMP_MS ?: 0L) as long
+                        echo "Prev timestamp: ${new Date(upd_timestamp_ms)}"
                         /* current threshold is 7 days */
                         long threshold_ms = 7L * 24L * 60L * 60L * 1000L
 
@@ -108,10 +109,13 @@ def run_pr_job(is_production=true) {
                                 event.event == 'reviewed'
                             })?.createdAt?.time ?: 0L
 
+                            echo "Last review: ${new Date(review_timestamp_ms)}"
+
                             upd_timestamp_ms = Math.max(review_timestamp_ms, upd_timestamp_ms)
 
                             if (upd_timestamp_ms == 0L) {
                                 upd_timestamp_ms = pr.updatedAt.time
+                                echo "PR updateAt: ${new Date(upd_timestamp_ms)}"
                             }
 
                             echo "$upd_timestamp_ms"
