@@ -90,7 +90,7 @@ def run_pr_job(is_production=true) {
                 long upd_timestamp_ms = 0L
                 long now_timestamp_ms = currentBuild.startTimeInMillis
                 try {
-                    if (currentBuild.rawBuild.causes[0] instanceof BranchIndexingCause) {
+                    if (currentBuild.rawBuild.causes[0] != null) {
                         upd_timestamp_ms = (currentBuild.previousBuild?.buildVariables?.UPD_TIMESTAMP_MS ?: 0L) as long
                         echo "Prev timestamp: ${new Date(upd_timestamp_ms)}"
                         /* current threshold is 7 days */
