@@ -101,7 +101,7 @@ def run_pr_job(is_production=true) {
                             def cred = Connector.lookupScanCredentials((Item) src.owner, src.apiUri, src.credentialsId)
 
                             def gh = Connector.connect(src.apiUri, cred)
-                            def pr = gh.getRepository("$src.repoOwner/$src.repository").getPullRequest(env.CHANGE_ID as int)
+                            def pr = gh.getRepository('Mbed-TLS/mbedtls').getPullRequest(5867)
 
                             long review_timestamp_ms = ((GHIssueEvent) pr.listEvents().find { event ->
                                 echo "Event: $event.event; createdAt: $event.createdAt"
