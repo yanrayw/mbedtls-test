@@ -17,7 +17,12 @@
  *  This file is part of Mbed TLS (https://www.trustedfirmware.org/projects/mbed-tls/)
  */
 
+import hudson.model.Item
 import jenkins.branch.BranchIndexingCause
+import jenkins.scm.api.SCMSource
+import org.jenkinsci.plugins.github_branch_source.Connector
+import org.jenkinsci.plugins.github_branch_source.GitHubSCMSource
+import org.kohsuke.github.GHIssueEvent
 
 def run_tls_tests(label_prefix='') {
     try {
@@ -86,9 +91,32 @@ def run_pr_job(is_production=true) {
                 long now_timestamp_ms = currentBuild.startTimeInMillis
                 try {
                     if (currentBuild.rawBuild.causes[0] instanceof BranchIndexingCause) {
-                        upd_timestamp_ms = (currentBuild.previousBuild?.buildVariables?.UPD_TIMESTAMP_MS ?: pullRequest.updatedAt.time) as long
+                        upd_timestamp_ms = (currentBuild.previousBuild?.buildVariables?.UPD_TIMESTAMP_MS ?: 0L) as long
                         /* current threshold is 7 days */
                         long threshold_ms = 7L * 24L * 60L * 60L * 1000L
+
+                        if (now_timestamp_ms - upd_timestamp_ms > threshold_ms) {
+                            def job = currentBuild.rawBuild.parent
+                            def src = (GitHubSCMSource) SCMSource.SourceByItem.findSource(job)
+                            def cred = Connector.lookupScanCredentials((Item) src.owner, src.apiUri, src.credentialsId)
+
+                            def gh = Connector.connect(src.apiUri, cred)
+                            def pr = gh.getRepository("$src.repoOwner/$src.repository").getPullRequest(env.CHANGE_ID as int)
+
+                            long review_timestamp_ms = ((GHIssueEvent) pr.listEvents().find { event ->
+                                echo "Event: $event.event; createdAt: $event.createdAt"
+                                event.event == 'reviewed'
+                            })?.createdAt?.time ?: 0L
+
+                            upd_timestamp_ms = Math.max(review_timestamp_ms, upd_timestamp_ms)
+
+                            if (upd_timestamp_ms == 0L) {
+                                upd_timestamp_ms = pr.updatedAt.time
+                            }
+
+                            echo "$upd_timestamp_ms"
+                        }
+
                         if (now_timestamp_ms - upd_timestamp_ms > threshold_ms) {
                             currentBuild.result = 'NOT_BUILT'
                             error("Pre Test Checks did not run: PR was last updated on ${new Date(upd_timestamp_ms)}.")
