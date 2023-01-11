@@ -267,12 +267,16 @@ RUN locale && \
     dpkg-reconfigure locales
 
 # Add user
-RUN useradd -m user
+ARG USER_NAME=user
+ARG USER_ID=1000
+ARG USER_GROUP=1000
+RUN groupadd -g $USER_GROUP -o $USER_NAME
+RUN useradd -m -u $USER_ID -g $USER_GROUP $USER_NAME
 
 # Create workspace
 ARG AGENT_WORKDIR=/var/lib/builds
-RUN mkdir -p ${AGENT_WORKDIR} && chown user:user ${AGENT_WORKDIR}
-USER user
+RUN mkdir -p ${AGENT_WORKDIR} && chown $USER_NAME:$USER_NAME ${AGENT_WORKDIR}
+USER $USER_NAME
 ENV AGENT_WORKDIR=${AGENT_WORKDIR}
 
 WORKDIR ${AGENT_WORKDIR}
