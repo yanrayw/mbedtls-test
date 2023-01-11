@@ -35,26 +35,76 @@
 #   docker_image_tag    Docker image to run.
 #
 
-if [ $# -ne 2 ]
-then
-    echo "$0: Not all arguments supplied!"
-    echo ""
-    echo "$0: usage: $0 mount_dir docker_image_tag"
+display_help() {
+    # echo some stuff here as help information
+    echo
+    echo "   -h, --help			help function"
+    echo "   $0: usage: $0 -m mount_dir -v docker_image_tag"
+    echo "   Eg: $0 (-d) -m ~ -v 18"
+    echo
     exit 1
-fi
-MOUNT_DIR=$1
-IMAGE=$2
+}
+
+#########################################################################
+# Check if parameters options are given on the commandline
+#########################################################################
+while [ $# -ge 1 ]; do
+    case "$1" in
+      -h | --help)
+          display_help  # Call your function
+          exit 0
+          ;;
+      -d | --detach)
+          detach="-d"  # run container in detach mode? 
+	  shift 1
+          ;;
+      -m | --mount)
+          mount_dir=$2  # the directory to mount
+	  shift 2
+          ;;
+      -v | --system_version) # which ubuntu version to run
+          ver=$2  #
+	  shift 2
+          ;;
+
+      --) # End of all options
+          shift
+          break
+          ;;
+      -*)
+          echo "Error: Unknown option: $1" >&2
+          # or call function display_help
+          exit 1
+          ;;
+      *)  # No more options
+          break
+          ;;
+    esac
+done
+
+. $(dirname -- "$0")/include.sh
+system_ver=$system-$ver$1.04
+container_name="$container_name_prefix.$system_ver"
+
+list_sh="$(dirname -- "$0")/list-docker-image-tags.sh"
+image_tag=$("$list_sh" "$system_ver")
+
 USR_NAME=`id -un`
 USR_ID=`id -u`
 USR_GRP=`id -g`
 SSH_CFG_PATH=~/.ssh
 
 echo "****************************************************"
-echo "  Running docker image - $IMAGE"
+echo "  Running docker image - $system_ver"
 echo "  User ID:Group ID --> $USR_ID:$USR_GRP"
 echo "  Mounting $SSH_CFG_PATH --> /home/user/.ssh"
-echo "  Mounting $MOUNT_DIR --> /var/lib/ws"
+echo "  Mounting $mount_dir --> /var/lib/ws"
+echo "  Creating container --> $container_name"
 echo "****************************************************"
 
-sudo docker run --network=host --rm -i -t -u $USR_ID:$USR_GRP -w /var/lib/ws -v $MOUNT_DIR:/var/lib/ws -v $SSH_CFG_PATH:/home/user/.ssh --cap-add SYS_PTRACE ${IMAGE}
+sudo docker run --network=host --rm -i -t                       \
+    $detach --name $container_name                              \
+    -u $USR_ID:$USR_GRP -w /var/lib/ws                          \
+    -v $mount_dir:/var/lib/ws -v $SSH_CFG_PATH:/home/user/.ssh  \
+    --cap-add SYS_PTRACE $image_prefix${system_ver}:${image_tag}
 
